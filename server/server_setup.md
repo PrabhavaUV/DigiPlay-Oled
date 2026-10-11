@@ -106,12 +106,21 @@ APP_API_KEY=my-mobile-app-static-key
 ENVIRONMENT=development
 PORT=8000
 ```
-* **`DATABASE_URL`**: Matches the user (`iot_user`), password (`iot_password`), and database (`iot_devices`) we created in Step 3.
+* **`DATABASE_URL`**: Matches the user (`iot_user`), password (`iot_password`), host (`localhost`), port (`5432`), and database (`iot_devices`).
+  * **Format**: `postgresql://<username>:<password>@<host>:<port>/<database_name>`
+  * **⚠️ Important Note on Port `5432`**: `5432` is PostgreSQL's default port. However, if your system has multiple PostgreSQL versions installed or a custom cluster, your active port might be `5433` or another number.
+  * **How to check your PostgreSQL port**:
+    ```bash
+    sudo -u postgres psql -c 'SHOW port;'
+    ```
+    *(If the output displays `5433` or another port, change `5432` in your `DATABASE_URL` to match that number!)*
 * **`SECRET_KEY`**: A secure random string used to sign administrator login tokens.
 * **`APP_API_KEY`**: A password shared between this server and the mobile app.
 
 ### Step 4: Seed the Administrator Account
-Run our automated database setup script:
+Run our database setup script to initialize the database tables and create an administrator account. You have two options:
+
+#### Option A: Quick Default Admin (Fastest)
 ```bash
 npm run seed
 ```
@@ -120,9 +129,29 @@ npm run seed
 [DB] Database synchronized. System ready.
 Successfully created admin user 'admin'!
 ```
-This automatically builds the database tables and creates your default administrator credentials:
+This automatically sets up default credentials:
 * **Username:** `admin`
 * **Password:** `admin123`
+
+#### Option B: Custom Admin Username & Password (Recommended for Security)
+To create your own custom credentials instead of the defaults, pass your chosen username and password directly:
+```bash
+node scripts/create_admin.js <your_username> <your_password>
+```
+*Example:*
+```bash
+node scripts/create_admin.js superadmin MyStrongP@ss2026!
+```
+*(Or using npm: `npm run seed -- superadmin MyStrongP@ss2026!`)*
+
+*Expected Output:*
+```text
+[DB] Database synchronized. System ready.
+Successfully created admin user 'superadmin'!
+```
+
+> [!TIP]
+> You can run this command again at any time with a new username to create additional administrator accounts for other operators. If an admin username already exists, the script will let you know and safely leave it untouched.
 
 ### Step 5: Start the Server!
 Now, launch the platform:
@@ -172,7 +201,7 @@ Here is a troubleshooting cheat sheet for any error you might encounter:
 |---|---|---|
 | `Error: listen EADDRINUSE: address already in use 0.0.0.0:1883` | Another instance of the server is already running in the background and holding port 1883. | Run `lsof -i :1883` to find the process ID (PID), then run `kill -9 <PID>` to close it. Then run `npm start` again. |
 | `Error: listen EADDRINUSE: address already in use :::8000` | Port 8000 is occupied by another app or an old server instance. | Run `lsof -i :8000` to find the PID, run `kill -9 <PID>`, and restart. |
-| `ConnectionRefusedError: connect ECONNREFUSED 127.0.0.1:5432` | The PostgreSQL database service is turned off. | Start PostgreSQL by running: `sudo systemctl start postgresql`. |
+| `ConnectionRefusedError: connect ECONNREFUSED 127.0.0.1:5432` | Either PostgreSQL is stopped, OR PostgreSQL is listening on a different port (such as 5433). | 1. Ensure PostgreSQL is active: `sudo systemctl start postgresql`.<br>2. Check your active port: `sudo -u postgres psql -c 'SHOW port;'`. If it is running on 5433 or another port, change `5432` in your `.env` `DATABASE_URL` to match it. |
 | `password authentication failed for user "iot_user"` | The password in `.env` doesn't match the PostgreSQL user password. | Reset the password by running: `sudo -u postgres psql -c "ALTER USER iot_user WITH PASSWORD 'iot_password';"` |
 | `database "iot_devices" does not exist` | The database was not created yet. | Create it with: `sudo -u postgres createdb -O iot_user iot_devices`. |
 | `[Database] FATAL: DATABASE_URL environment variable is required` | The `.env` file is missing or in the wrong folder. | Make sure `.env` is sitting directly inside the `server/` directory. Run `cp .env.example .env`. |
